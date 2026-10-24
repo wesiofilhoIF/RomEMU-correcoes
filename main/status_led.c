@@ -154,7 +154,7 @@ esp_err_t status_led_init(void)
         gpio_set_level((gpio_num_t)s_gpio_pins[i], 0);
     }
 
-    status_led_set_color(LED_COLOR_YELLOW);
+    status_led_set_color(LED_COLOR_BLUE);
     return ESP_OK;
 }
 
@@ -170,10 +170,9 @@ void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
         }
     }
 
-    /* Update standard digital LEDs: ON if any color component is active, OFF if black */
-    int level = (r > 0 || g > 0 || b > 0) ? 1 : 0;
+    /* Turn OFF all digital GPIOs during this probe test */
     for (size_t i = 0; i < NUM_GPIO_PINS; i++) {
-        gpio_set_level((gpio_num_t)s_gpio_pins[i], level);
+        gpio_set_level((gpio_num_t)s_gpio_pins[i], 0);
     }
 }
 
@@ -181,15 +180,11 @@ void status_led_set_color(status_led_color_t color)
 {
     s_base_color = color;
     switch (color) {
-    case LED_COLOR_BLACK:   status_led_set_rgb(0, 0, 0); break;
-    case LED_COLOR_RED:     status_led_set_rgb(45, 0, 0); break;
-    case LED_COLOR_GREEN:   status_led_set_rgb(0, 45, 0); break;
-    case LED_COLOR_BLUE:    status_led_set_rgb(0, 0, 45); break;
-    case LED_COLOR_YELLOW:  status_led_set_rgb(40, 35, 0); break;
-    case LED_COLOR_CYAN:    status_led_set_rgb(0, 35, 40); break;
-    case LED_COLOR_MAGENTA: status_led_set_rgb(40, 0, 40); break;
-    case LED_COLOR_WHITE:   status_led_set_rgb(35, 35, 35); break;
-    case LED_COLOR_ORANGE:  status_led_set_rgb(45, 18, 0); break;
+    case LED_COLOR_BLACK: status_led_set_rgb(0, 0, 0); break;
+    case LED_COLOR_RED:   status_led_set_rgb(50, 0, 0); break;   /* Pure Red */
+    case LED_COLOR_GREEN: status_led_set_rgb(0, 50, 0); break;   /* Pure Green */
+    case LED_COLOR_BLUE:  status_led_set_rgb(0, 0, 50); break;   /* Pure Blue */
+    case LED_COLOR_WHITE: status_led_set_rgb(40, 40, 40); break; /* Pure White flash */
     default: break;
     }
 }

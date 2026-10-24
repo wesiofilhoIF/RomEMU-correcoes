@@ -5,16 +5,13 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
+/* Status LED states: Single Pure Colors for maximum clarity without RGB blending artifacts */
 typedef enum {
     LED_COLOR_BLACK = 0,
     LED_COLOR_RED,      /* Error / Fault */
-    LED_COLOR_GREEN,    /* Ready / Idle */
-    LED_COLOR_BLUE,     /* WiFi connecting */
-    LED_COLOR_YELLOW,   /* Booting */
-    LED_COLOR_CYAN,     /* Emulation Active (Inserted) */
-    LED_COLOR_MAGENTA,  /* Upload in progress */
-    LED_COLOR_WHITE,    /* SPI Read activity (Flash POST) */
-    LED_COLOR_ORANGE    /* SPI Write activity */
+    LED_COLOR_GREEN,    /* Ready / Idle (Pure Green) */
+    LED_COLOR_BLUE,     /* Emulation Active / Inserted (Pure Blue) */
+    LED_COLOR_WHITE,    /* Activity Flash (POST / Read) */
 } status_led_color_t;
 
 esp_err_t status_led_init(void);

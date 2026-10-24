@@ -535,7 +535,7 @@ esp_err_t spi_flash_emu_init(void)
 
 esp_err_t spi_flash_emu_start(chip_type_t chip)
 {
-    status_led_set_color(LED_COLOR_CYAN);
+    status_led_set_color(LED_COLOR_BLUE);
     const spi_chip_info_t *info = spi_chip_find(chip);
     if (!info) {
         ESP_LOGE(TAG, "Unknown SPI chip type: %d", chip);
