@@ -16,6 +16,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "status_led.h"
 #include "cJSON.h"
 
 #include <string.h>
@@ -235,6 +236,7 @@ esp_err_t handler_api_slot_action(httpd_req_t *req)
 
 esp_err_t handler_api_slot_upload(httpd_req_t *req)
 {
+    status_led_set_color(LED_COLOR_MAGENTA);
     int slot = parse_slot_from_uri(req->uri);
     if (slot < 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid slot");
@@ -360,6 +362,7 @@ esp_err_t handler_api_slot_upload(httpd_req_t *req)
         }
 
         sse_manager_notify_slot_change();
+        status_led_set_color(LED_COLOR_GREEN);
         httpd_resp_set_type(req, "application/json");
         char resp[128];
         snprintf(resp, sizeof(resp), "{\"ok\":true,\"slot\":%d,\"size\":%d}", slot, received);
@@ -381,6 +384,7 @@ esp_err_t handler_api_slot_upload(httpd_req_t *req)
 
     sse_manager_notify_slot_change();
 
+    status_led_set_color(LED_COLOR_GREEN);
     httpd_resp_set_type(req, "application/json");
     char resp[128];
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"slot\":%d,\"size\":%d}", slot, received);

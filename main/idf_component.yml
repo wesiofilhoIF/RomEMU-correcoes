@@ -16,4 +16,5 @@ dependencies:
   #   public: true
   espressif/mdns: '*'
   espressif/cjson: '*'
-  espressif/ip101: '*'
+  espressif/led_strip: '^2.5.0'
+#  espressif/ip101: '*'

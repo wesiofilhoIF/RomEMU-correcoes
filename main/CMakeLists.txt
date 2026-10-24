@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "main.c"
+        "status_led.c"
         "spi_flash_emu.c"
         "i2c_eeprom_emu.c"
         "rom_store.c"

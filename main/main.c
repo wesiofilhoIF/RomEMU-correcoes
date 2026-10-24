@@ -22,6 +22,7 @@
 #include "web_server.h"
 #include "sse_manager.h"
 #include "gpio_control.h"
+#include "status_led.h"
 #include "pin_config.h"
 
 static const char *TAG = "romemu";
@@ -34,6 +35,9 @@ static const char *TAG = "romemu";
 
 void app_main(void)
 {
+    /* 0. Initialize Status RGB LED */
+    status_led_init();
+
     ESP_LOGI(TAG, "===========================================");
     ESP_LOGI(TAG, "  ROMEMU - %s ROM Emulator v1.1", TARGET_NAME);
     ESP_LOGI(TAG, "===========================================");
@@ -62,7 +66,11 @@ void app_main(void)
     /* 4. Initialize access log */
     access_log_init();
 
-    /* 5. Initialize networking stack (must come before any network manager) */
+    /* 5. Initialize emulators (hardware peripherals) - BEFORE WIFI to guarantee DMA buffers! */
+    ESP_ERROR_CHECK(spi_flash_emu_init());
+    ESP_ERROR_CHECK(i2c_eeprom_emu_init());
+
+    /* 6. Initialize networking stack (must come before any network manager) */
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -75,18 +83,14 @@ void app_main(void)
     ESP_ERROR_CHECK(wifi_manager_init());
 #endif
 
-    /* 6. Initialize SSE manager */
+    /* 7. Initialize SSE manager */
     sse_manager_init();
 
-    /* 7. Start HTTP server */
+    /* 8. Start HTTP server */
     ESP_ERROR_CHECK(web_server_start());
 
-    /* 8. Initialize GPIO control (reset + power) */
+    /* 9. Initialize GPIO control (reset + power) */
     ESP_ERROR_CHECK(gpio_control_init());
-
-    /* 9. Initialize emulators (hardware peripherals) */
-    ESP_ERROR_CHECK(spi_flash_emu_init());
-    ESP_ERROR_CHECK(i2c_eeprom_emu_init());
 
     /* Log startup info */
     ESP_LOGI(TAG, "-------------------------------------------");
@@ -104,6 +108,7 @@ void app_main(void)
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     ESP_LOGI(TAG, "-------------------------------------------");
     ESP_LOGI(TAG, "Ready. Upload a ROM image via the web UI.");
+    status_led_set_color(LED_COLOR_GREEN);
     ESP_LOGI(TAG, "SPI pins: CS=%d CLK=%d MOSI=%d MISO=%d WP=%d HD=%d",
              PIN_SPI_CS, PIN_SPI_CLK, PIN_SPI_MOSI, PIN_SPI_MISO,
              PIN_SPI_WP, PIN_SPI_HD);

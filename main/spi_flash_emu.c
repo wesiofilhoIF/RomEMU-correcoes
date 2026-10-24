@@ -3,6 +3,7 @@
 #include "rom_store.h"
 #include "compressed_store.h"
 #include "access_log.h"
+#include "status_led.h"
 #include "pin_config.h"
 
 #include "driver/spi_slave.h"
@@ -534,6 +535,7 @@ esp_err_t spi_flash_emu_init(void)
 
 esp_err_t spi_flash_emu_start(chip_type_t chip)
 {
+    status_led_set_color(LED_COLOR_CYAN);
     const spi_chip_info_t *info = spi_chip_find(chip);
     if (!info) {
         ESP_LOGE(TAG, "Unknown SPI chip type: %d", chip);
@@ -596,6 +598,7 @@ esp_err_t spi_flash_emu_start(chip_type_t chip)
 
 esp_err_t spi_flash_emu_stop(void)
 {
+    status_led_set_color(LED_COLOR_GREEN);
     if (!s_ctx.running) return ESP_OK;
 
     s_ctx.running = false;
