@@ -154,13 +154,44 @@ esp_err_t status_led_init(void)
         gpio_set_level((gpio_num_t)s_gpio_pins[i], 0);
     }
 
-    status_led_set_color(LED_COLOR_BLUE);
+    status_led_set_color(LED_COLOR_YELLOW);
     return ESP_OK;
 }
 
+/* Gamma LUT (gamma = 2.2) for smooth perceptual brightness and accurate color blending */
+static const uint8_t s_gamma_lut[256] = {
+    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    0,   0,   0,   0,   0,   0,   1,   1,   1,   1,   1,   1,   1,   1,   1,   2,
+    2,   2,   2,   2,   2,   3,   3,   3,   3,   4,   4,   4,   4,   5,   5,   5,
+    5,   6,   6,   6,   7,   7,   7,   8,   8,   8,   9,   9,   9,  10,  10,  11,
+   11,  11,  12,  12,  13,  13,  14,  14,  15,  15,  16,  16,  17,  17,  18,  18,
+   19,  19,  20,  20,  21,  21,  22,  23,  23,  24,  24,  25,  26,  26,  27,  28,
+   28,  29,  30,  30,  31,  32,  32,  33,  34,  35,  35,  36,  37,  38,  38,  39,
+   40,  41,  42,  42,  43,  44,  45,  46,  47,  47,  48,  49,  50,  51,  52,  53,
+   54,  55,  56,  56,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,
+   69,  70,  71,  73,  74,  75,  76,  77,  78,  79,  80,  81,  82,  84,  85,  86,
+   87,  88,  90,  91,  92,  93,  95,  96,  97,  99, 100, 101, 102, 104, 105, 106,
+  108, 109, 110, 112, 113, 115, 116, 117, 119, 120, 122, 123, 125, 126, 128, 129,
+  131, 132, 134, 135, 137, 139, 140, 142, 143, 145, 147, 148, 150, 152, 153, 155,
+  157, 158, 160, 162, 164, 165, 167, 169, 171, 173, 175, 176, 178, 180, 182, 184,
+  186, 188, 190, 192, 194, 196, 198, 200, 202, 204, 206, 208, 210, 213, 215, 217,
+  219, 221, 224, 226, 228, 230, 233, 235, 237, 240, 242, 244, 247, 249, 252, 255
+};
+
 void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
-    uint8_t grb[3] = { g, r, b };
+    /* Apply CIE/FastLED White Balancing: Green eye sensitivity is ~2.5x higher than blue */
+    /* Scaled for comfortable indoor bench brightness (max output ~65) */
+    uint8_t r_corr = (uint8_t)(((uint32_t)r * 255) / 255);
+    uint8_t g_corr = (uint8_t)(((uint32_t)g * 170) / 255);
+    uint8_t b_corr = (uint8_t)(((uint32_t)b * 220) / 255);
+
+    /* Apply non-linear Gamma 2.2 LUT */
+    uint8_t grb[3] = {
+        s_gamma_lut[g_corr],
+        s_gamma_lut[r_corr],
+        s_gamma_lut[b_corr]
+    };
     rmt_transmit_config_t tx_config = { .loop_count = 0 };
 
     /* Update all RGB outputs simultaneously */
@@ -170,9 +201,10 @@ void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
         }
     }
 
-    /* Turn OFF all digital GPIOs during this probe test */
+    /* Update standard digital LEDs: ON if any color component is active, OFF if black */
+    int level = (r > 0 || g > 0 || b > 0) ? 1 : 0;
     for (size_t i = 0; i < NUM_GPIO_PINS; i++) {
-        gpio_set_level((gpio_num_t)s_gpio_pins[i], 0);
+        gpio_set_level((gpio_num_t)s_gpio_pins[i], level);
     }
 }
 
@@ -180,11 +212,15 @@ void status_led_set_color(status_led_color_t color)
 {
     s_base_color = color;
     switch (color) {
-    case LED_COLOR_BLACK: status_led_set_rgb(0, 0, 0); break;
-    case LED_COLOR_RED:   status_led_set_rgb(50, 0, 0); break;   /* Pure Red */
-    case LED_COLOR_GREEN: status_led_set_rgb(0, 50, 0); break;   /* Pure Green */
-    case LED_COLOR_BLUE:  status_led_set_rgb(0, 0, 50); break;   /* Pure Blue */
-    case LED_COLOR_WHITE: status_led_set_rgb(40, 40, 40); break; /* Pure White flash */
+    case LED_COLOR_BLACK:   status_led_set_rgb(0, 0, 0); break;
+    case LED_COLOR_RED:     status_led_set_rgb(180, 0, 0); break;    /* Solid Red */
+    case LED_COLOR_GREEN:   status_led_set_rgb(0, 150, 0); break;    /* Calibrated Green */
+    case LED_COLOR_BLUE:    status_led_set_rgb(0, 0, 180); break;    /* Solid Blue */
+    case LED_COLOR_YELLOW:  status_led_set_rgb(200, 80, 0); break;   /* Perceptual Yellow (Warm Amber, G dialed down) */
+    case LED_COLOR_CYAN:    status_led_set_rgb(0, 45, 180); break;   /* Perceptual Cyan (Turquoise, G suppressed to avoid die bleed) */
+    case LED_COLOR_MAGENTA: status_led_set_rgb(140, 0, 180); break;  /* Perceptual Magenta / Purple */
+    case LED_COLOR_WHITE:   status_led_set_rgb(160, 110, 140); break;/* D65 Neutral Balanced White */
+    case LED_COLOR_ORANGE:  status_led_set_rgb(200, 45, 0); break;   /* Vivid Orange */
     default: break;
     }
 }

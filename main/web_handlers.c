@@ -236,7 +236,7 @@ esp_err_t handler_api_slot_action(httpd_req_t *req)
 
 esp_err_t handler_api_slot_upload(httpd_req_t *req)
 {
-    status_led_set_color(LED_COLOR_RED);
+    status_led_set_color(LED_COLOR_MAGENTA);
     int slot = parse_slot_from_uri(req->uri);
     if (slot < 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid slot");

@@ -5,13 +5,21 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-/* Status LED states: Single Pure Colors for maximum clarity without RGB blending artifacts */
+/*
+ * Status LED states: Rich Perceptual Palette
+ * Calibrated for naked WS2812B LEDs with optical white-balancing
+ * (compensates for eye sensitivity to green and bare-die separation)
+ */
 typedef enum {
     LED_COLOR_BLACK = 0,
-    LED_COLOR_RED,      /* Error / Fault */
-    LED_COLOR_GREEN,    /* Ready / Idle (Pure Green) */
-    LED_COLOR_BLUE,     /* Emulation Active / Inserted (Pure Blue) */
-    LED_COLOR_WHITE,    /* Activity Flash (POST / Read) */
+    LED_COLOR_RED,      /* Error / Fault (Pure Red) */
+    LED_COLOR_GREEN,    /* Ready / Idle (Balanced Green) */
+    LED_COLOR_BLUE,     /* Connecting / Staging (Pure Blue) */
+    LED_COLOR_YELLOW,   /* Booting / Initializing (Perceptual Yellow) */
+    LED_COLOR_CYAN,     /* Emulation Active / Inserted (Perceptual Cyan: G suppressed, B dominant) */
+    LED_COLOR_MAGENTA,  /* Upload in progress (Perceptual Magenta / Violet) */
+    LED_COLOR_WHITE,    /* Activity Flash / POST (Balanced D65 White) */
+    LED_COLOR_ORANGE    /* Target Power / Reset event */
 } status_led_color_t;
 
 esp_err_t status_led_init(void);
