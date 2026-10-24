@@ -84,7 +84,7 @@ esp_err_t web_server_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = URI_HANDLER_COUNT + 4;
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.stack_size = 16384;
+    config.stack_size = 24576;
     config.max_open_sockets = 7;
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 30;
