@@ -1,4 +1,38 @@
-# RomEMU
+# RomEMU — Edição Corrigida para Placas-Mãe X99 / BIOS de 16MB
+
+> **Fork mantido por [wesiofilhoIF](https://github.com/wesiofilhoIF)**  
+> Adicionado suporte completo a **BIOS de 16 MB (W25Q128)** em placas **ESP32-S3 de 8 MB PSRAM** com **Zero-Copy LZ4 Ingestion** e scripts de upload/conversão para a comunidade Xeon!
+
+---
+
+### 🚀 O que foi corrigido neste Fork:
+
+1. **Fim do Out of Memory (OOM / HTTP 500) em imagens de 16 MB:**
+   * O firmware upstream tentava manter a descompressão bruta ou buffers duplicados na PSRAM, que estouram os 8 MB do ESP32-S3.
+   * Implementada a função `cstore_create_from_lz4_archive()` com **Zero-Copy**: o ESP32 recebe a stream de blocos LZ4 pré-compactados e a adota diretamente na PSRAM.
+   * **Consumo de PSRAM:** reduzido de 16 MB para apenas **~4.7 MB**, sobrando mais de 3.5 MB de folga!
+2. **Compressão e Ingestão de Blocos LZ4 de 4 KB:**
+   * Detecção inteligente de blocos apagados (`0xFF`) — blocos vazios não ocupam memória na PSRAM.
+3. **Persistência NVS e Emulação Automática:**
+   * Salvamento do estado dos slots e do chip SPI (`W25Q128JV`) na memória NVS.
+
+---
+
+### 📦 Como Subir BIOS de 16 MB (Jginyue X99-XD4, X99-TI D4, Huananzhi, etc.):
+
+Use o script Python auxiliar `tools/upload_x99_bios.py`:
+
+```bash
+# 1. Instale o lz4 e requests
+pip install lz4 requests
+
+# 2. Envie sua BIOS (.rom / .bin) direto para o ESP32-S3
+python3 tools/upload_x99_bios.py --ip 192.168.1.248 --rom minha_bios_mod.rom --label X99_XD4_MOD
+```
+
+---
+
+# RomEMU Original
 
 **SPI Flash & I2C EEPROM emulator with real-time web interface for ESP32-S3 and ESP32-P4.**
 

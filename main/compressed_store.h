@@ -116,3 +116,27 @@ int cstore_get_stats_json(const cstore_t *cs, char *buf, size_t buf_size);
  * Get the PSRAM memory used by this store (compressed data + metadata).
  */
 uint32_t cstore_get_psram_usage(const cstore_t *cs);
+
+/**
+ * Create a compressed store directly from DEFLATE-compressed data.
+ * Decompresses block-by-block (4KB) using miniz tinfl, then LZ4-compresses
+ * each block into PSRAM. Peak memory: deflate_buf + LZ4 output + ~8KB temps.
+ * NEVER allocates the full decompressed image in memory.
+ *
+ * deflate_data: raw DEFLATE stream (from browser CompressionStream).
+ * deflate_size: size of the DEFLATE stream in bytes.
+ * original_size: expected decompressed size (from X-Original-Size header).
+ * chip_size: emulated chip capacity (may be > original_size).
+ *
+ * Returns NULL on failure.
+ */
+/**
+ * Create a compressed store directly from pre-compressed LZ4 blocks.
+ * lz4_archive format:
+ *   [uint32_t num_blocks]
+ *   [uint16_t comp_sizes[num_blocks]] (0 = erased 0xFF, block_len = raw)
+ *   [raw compressed block data concatenated...]
+ * Peak memory during upload: exactly the archive size in PSRAM!
+ */
+cstore_t *cstore_create_from_lz4_archive(uint8_t *archive, uint32_t archive_size,
+                                         uint32_t original_size, uint32_t chip_size);

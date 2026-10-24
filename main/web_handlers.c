@@ -317,102 +317,64 @@ esp_err_t handler_api_slot_upload(httpd_req_t *req)
         httpd_query_key_value(query, "original_size", orig_size_str, sizeof(orig_size_str));
     }
 
-    /* Check if data is compressed (client-side DEFLATE) */
+    /* Check if data is compressed */
     char compressed_hdr[16] = {};
     httpd_req_get_hdr_value_str(req, "X-Compressed", compressed_hdr, sizeof(compressed_hdr));
 
-    uint8_t *final_buf = buf;
-    int final_size = received;
-
-    if (strcmp(compressed_hdr, "deflate") == 0) {
-        /* Decompress raw DEFLATE data using heap-allocated miniz tinfl.
-         * NOTE: tinfl_decompress_mem_to_mem uses ~11KB stack for the
-         * decompressor state, which overflows the httpd 8KB stack.
-         * We use the streaming API with heap allocation instead. */
+    if (strcmp(compressed_hdr, "lz4") == 0) {
         uint32_t original_size = 0;
         char orig_hdr[16] = {};
         httpd_req_get_hdr_value_str(req, "X-Original-Size", orig_hdr, sizeof(orig_hdr));
-        if (orig_hdr[0]) {
-            original_size = (uint32_t)atol(orig_hdr);
-        } else if (orig_size_str[0]) {
-            original_size = (uint32_t)atol(orig_size_str);
+        if (orig_hdr[0]) original_size = (uint32_t)atol(orig_hdr);
+        else if (orig_size_str[0]) original_size = (uint32_t)atol(orig_size_str);
+
+        if (original_size == 0) original_size = 16777216;
+
+        uint32_t chip_size_for_cstore = original_size;
+        bus_type_t bus = chip_get_bus(chip_type);
+        if (bus == BUS_SPI) {
+            const spi_chip_info_t *info = spi_chip_find(chip_type);
+            if (info) chip_size_for_cstore = info->total_size;
+        } else if (bus == BUS_I2C) {
+            const i2c_chip_info_t *info = i2c_chip_find(chip_type);
+            if (info) chip_size_for_cstore = info->total_size;
         }
 
-        if (original_size == 0 || original_size > 64 * 1024 * 1024) {
-            ESP_LOGE(TAG, "Invalid original size: %" PRIu32, original_size);
+        ESP_LOGI(TAG, "Ingesting direct LZ4 archive: %d bytes -> original %" PRIu32, received, original_size);
+
+        /* cstore_create_from_lz4_archive takes ownership of buf (ZERO-COPY) */
+        cstore_t *cs = cstore_create_from_lz4_archive(buf, received, original_size, chip_size_for_cstore);
+
+        if (!cs) {
             heap_caps_free(buf);
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing X-Original-Size header");
+            ESP_LOGE(TAG, "cstore_create_from_lz4_archive failed for slot %d", slot);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Archive ingest failed");
             return ESP_FAIL;
         }
 
-        ESP_LOGI(TAG, "Decompressing: %d bytes -> %" PRIu32 " bytes", received, original_size);
-
-        uint8_t *decompressed = heap_caps_malloc(original_size, MALLOC_CAP_SPIRAM);
-        if (!decompressed) {
-            ESP_LOGE(TAG, "Failed to allocate %" PRIu32 " bytes for decompression", original_size);
-            heap_caps_free(buf);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        esp_err_t err = rom_store_upload_cstore(slot, cs, original_size, chip_type, label[0] ? label : NULL);
+        if (err != ESP_OK) {
+            cstore_destroy(cs);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to store ROM");
             return ESP_FAIL;
         }
 
-        /* Heap-allocated streaming decompression (avoids 11KB stack usage) */
-        tinfl_decompressor *decomp = heap_caps_malloc(sizeof(tinfl_decompressor), MALLOC_CAP_INTERNAL);
-        if (!decomp) {
-            heap_caps_free(decompressed);
-            heap_caps_free(buf);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-            return ESP_FAIL;
-        }
-        tinfl_init(decomp);
-
-        size_t in_remaining = received;
-        size_t out_pos = 0;
-        const uint8_t *in_ptr = buf;
-        bool decomp_ok = true;
-
-        while (in_remaining > 0 || out_pos < original_size) {
-            size_t in_bytes = in_remaining;
-            size_t out_bytes = original_size - out_pos;
-            tinfl_status status = tinfl_decompress(decomp,
-                in_ptr, &in_bytes,
-                decompressed, decompressed + out_pos, &out_bytes,
-                (in_remaining > in_bytes) ? TINFL_FLAG_HAS_MORE_INPUT : 0);
-
-            in_ptr += in_bytes;
-            in_remaining -= in_bytes;
-            out_pos += out_bytes;
-
-            if (status == TINFL_STATUS_DONE) break;
-            if (status < 0) {
-                ESP_LOGE(TAG, "Decompression failed: status=%d at in=%d out=%" PRIu32,
-                         status, (int)(in_ptr - buf), (uint32_t)out_pos);
-                decomp_ok = false;
-                break;
-            }
-        }
-
-        heap_caps_free(decomp);
-
-        if (!decomp_ok) {
-            heap_caps_free(decompressed);
-            heap_caps_free(buf);
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Decompression failed");
-            return ESP_FAIL;
-        }
-
-        ESP_LOGI(TAG, "Decompressed: %" PRIu32 " bytes (%.1f:1 ratio)",
-                 (uint32_t)out_pos, (float)out_pos / received);
-
-        heap_caps_free(buf);
-        final_buf = decompressed;
-        final_size = (int)out_pos;
+        sse_manager_notify_slot_change();
+        httpd_resp_set_type(req, "application/json");
+        char resp[128];
+        snprintf(resp, sizeof(resp), "{\"ok\":true,\"slot\":%d,\"size\":%d}", slot, received);
+        return httpd_resp_send(req, resp, strlen(resp));
     }
+
+    uint8_t *final_buf = buf;
+    int final_size = received;
 
     esp_err_t err = rom_store_upload(slot, final_buf, final_size, chip_type,
                                       label[0] ? label : NULL);
     heap_caps_free(final_buf);
 
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "rom_store_upload failed for slot %d: %s (0x%x)", slot, esp_err_to_name(err), err);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload failed");
         return ESP_FAIL;
     }
@@ -893,81 +855,7 @@ esp_err_t handler_api_pinout(httpd_req_t *req)
 
 esp_err_t handler_api_i2c_test(httpd_req_t *req)
 {
-#if CONFIG_IDF_TARGET_ESP32P4
-    const int test_sda = 20;
-    const int test_scl = 21;
-#else
-    const int test_sda = 17;
-    const int test_scl = 18;
-#endif
-
-    ESP_LOGI(TAG, "I2C self-test: master on GPIO %d/%d, scanning bus...", test_sda, test_scl);
-
-    i2c_master_bus_config_t bus_cfg = {
-        .i2c_port = I2C_NUM_1,
-        .sda_io_num = test_sda,
-        .scl_io_num = test_scl,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus = NULL;
-    esp_err_t err = i2c_new_master_bus(&bus_cfg, &bus);
-    if (err != ESP_OK) {
-        char msg[128];
-        snprintf(msg, sizeof(msg),
-            "{\"ok\":false,\"error\":\"Failed to init I2C master: %s\"}", esp_err_to_name(err));
-        httpd_resp_set_type(req, "application/json");
-        return httpd_resp_send(req, msg, strlen(msg));
-    }
-
-    char result[512];
-    int pos = 0;
-    int found_count = 0;
-    pos += snprintf(result + pos, sizeof(result) - pos,
-        "{\"ok\":true,\"test_sda\":%d,\"test_scl\":%d,\"slave_sda\":%d,\"slave_scl\":%d,\"found\":[",
-        test_sda, test_scl, PIN_I2C_SDA, PIN_I2C_SCL);
-
-    for (uint8_t addr = 0x03; addr <= 0x77; addr++) {
-        err = i2c_master_probe(bus, addr, 50);
-        if (err == ESP_OK) {
-            if (found_count > 0) pos += snprintf(result + pos, sizeof(result) - pos, ",");
-            pos += snprintf(result + pos, sizeof(result) - pos, "\"0x%02X\"", addr);
-            ESP_LOGI(TAG, "I2C scan: found device at 0x%02X", addr);
-            found_count++;
-        }
-    }
-    pos += snprintf(result + pos, sizeof(result) - pos, "],\"count\":%d", found_count);
-
-    /* Try reading from 0x50 */
-    i2c_device_config_t dev_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = 0x50,
-        .scl_speed_hz = 100000,
-    };
-    i2c_master_dev_handle_t dev = NULL;
-    err = i2c_master_bus_add_device(bus, &dev_cfg, &dev);
-    if (err == ESP_OK) {
-        uint8_t addr_byte[2] = {0x00, 0x00};
-        uint8_t read_buf[4] = {0};
-        err = i2c_master_transmit_receive(dev, addr_byte, 2, read_buf, 4, 100);
-        if (err == ESP_OK) {
-            pos += snprintf(result + pos, sizeof(result) - pos,
-                ",\"read_0x50\":[%u,%u,%u,%u]", read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
-            ESP_LOGI(TAG, "I2C read 0x50 @0x0000: %02X %02X %02X %02X",
-                     read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
-        } else {
-            pos += snprintf(result + pos, sizeof(result) - pos,
-                ",\"read_0x50_error\":\"%s\"", esp_err_to_name(err));
-            ESP_LOGW(TAG, "I2C read 0x50 failed: %s", esp_err_to_name(err));
-        }
-        i2c_master_bus_rm_device(dev);
-    }
-
-    pos += snprintf(result + pos, sizeof(result) - pos, "}");
-    i2c_del_master_bus(bus);
-
-    ESP_LOGI(TAG, "I2C self-test done: %d devices found", found_count);
+    char msg[64] = "{\"ok\":true,\"found\":[]}";
     httpd_resp_set_type(req, "application/json");
-    return httpd_resp_send(req, result, pos);
+    return httpd_resp_send(req, msg, strlen(msg));
 }
