@@ -507,8 +507,8 @@ static void spi_emu_task(void *arg)
                     status_led_set_rgb(0, 0, 0);   /* Apagado no ciclo de piscar */
                 }
             } else {
-                /* Se CS desceu para 0, mantém verde pronto para leitura */
-                status_led_set_rgb(0, 80, 0);
+                /* Se CS desceu para 0 mas ainda não transmitiu bytes, fica 100% apagado esperando os dados */
+                status_led_set_rgb(0, 0, 0);
             }
             continue;
         }
@@ -523,7 +523,9 @@ static void spi_emu_task(void *arg)
 
         /* Process the transaction */
         process_transaction(ctx->rx_buf, rx_len, ctx->tx_buf, SPI_BUF_SIZE);
-        status_led_set_rgb(0, 255, 0); /* Verde escuro e forte saturado na leitura SPI */
+        status_led_set_rgb(0, 255, 0); /* VERDE 100% puro e saturado na leitura SPI */
+        vTaskDelay(pdMS_TO_TICKS(15));  /* Mantém o flash verde visível ao olho humano */
+        status_led_set_rgb(0, 0, 0);   /* Apaga após a transação */
 
         /* Notifica subsistema de NVRAM persistente em caso de gravações na BIOS */
         uint8_t first_cmd = ctx->rx_buf[0];
@@ -567,7 +569,7 @@ esp_err_t spi_flash_emu_init(void)
 
 esp_err_t spi_flash_emu_start(chip_type_t chip)
 {
-    status_led_set_color(LED_COLOR_BLUE);
+    status_led_set_color(LED_COLOR_BLACK);
     const spi_chip_info_t *info = spi_chip_find(chip);
     if (!info) {
         ESP_LOGE(TAG, "Unknown SPI chip type: %d", chip);
@@ -635,7 +637,7 @@ esp_err_t spi_flash_emu_start(chip_type_t chip)
 
 esp_err_t spi_flash_emu_stop(void)
 {
-    status_led_set_color(LED_COLOR_GREEN);
+    status_led_set_color(LED_COLOR_BLACK);
     if (!s_ctx.running) return ESP_OK;
 
     s_ctx.running = false;

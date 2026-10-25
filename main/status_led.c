@@ -208,20 +208,28 @@ void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
     }
 }
 
+/* Transições claras e sem confusão de cores:
+   - LED_COLOR_BLACK: Desligado
+   - LED_COLOR_RED: Erro crítico
+   - LED_COLOR_CYAN: Pronto / Emulação ativa em repouso (Ciano/Turquesa suave)
+   - LED_COLOR_BLUE: CS=1 (Azul 100% puro piscando no loop SPI)
+   - LED_COLOR_GREEN: Leitura / Transação SPI ativa em andamento (Verde vibrante único!)
+   - LED_COLOR_MAGENTA: Upload de BIOS
+   - LED_COLOR_YELLOW: Inicialização / Boot
+*/
 void status_led_set_color(status_led_color_t color)
 {
     s_base_color = color;
     switch (color) {
     case LED_COLOR_BLACK:   status_led_set_rgb(0, 0, 0); break;
-    case LED_COLOR_RED:     status_led_set_rgb(180, 0, 0); break;    /* Solid Red */
-    case LED_COLOR_GREEN:   status_led_set_rgb(0, 80, 0); break;    /* Verde bem escuro e denso (Ready) */
-    case LED_COLOR_BLUE:    status_led_set_rgb(0, 0, 180); break;    /* Solid Blue */
-    case LED_COLOR_YELLOW:  status_led_set_rgb(200, 80, 0); break;   /* Perceptual Yellow (Warm Amber, G dialed down) */
-    case LED_COLOR_CYAN:    status_led_set_rgb(0, 45, 180); break;   /* Perceptual Cyan (Turquoise, G suppressed to avoid die bleed) */
-    case LED_COLOR_MAGENTA: status_led_set_rgb(140, 0, 180); break;  /* Perceptual Magenta / Purple */
-    case LED_COLOR_WHITE:   status_led_set_rgb(160, 110, 140); break;/* D65 Neutral Balanced White */
-    case LED_COLOR_ORANGE:  status_led_set_rgb(200, 45, 0); break;   /* Vivid Orange */
-    default: break;
+    case LED_COLOR_RED:     status_led_set_rgb(255, 0, 0); break;    /* Solid Red */
+    case LED_COLOR_GREEN:   status_led_set_rgb(0, 255, 0); break;    /* Verde brilhante 100% puro e único */
+    case LED_COLOR_BLUE:    status_led_set_rgb(0, 0, 255); break;    /* Solid Blue */
+    case LED_COLOR_YELLOW:  status_led_set_rgb(220, 90, 0); break;   /* Warm Amber */
+    case LED_COLOR_CYAN:    status_led_set_rgb(0, 60, 180); break;   /* Ciano suave para Standby */
+    case LED_COLOR_MAGENTA: status_led_set_rgb(180, 0, 220); break;  /* Magenta / Purple */
+    case LED_COLOR_WHITE:   status_led_set_rgb(160, 140, 160); break;/* Neutral White */
+    case LED_COLOR_ORANGE:  status_led_set_rgb(220, 50, 0); break;   /* Vivid Orange */
     }
 }
 

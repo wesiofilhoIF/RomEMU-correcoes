@@ -112,7 +112,7 @@ void app_main(void)
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     ESP_LOGI(TAG, "-------------------------------------------");
     ESP_LOGI(TAG, "Ready. Upload a ROM image via the web UI.");
-    status_led_set_color(LED_COLOR_GREEN);
+    status_led_set_color(LED_COLOR_BLACK); /* Desliga o LED no boot - fica 100% apagado até o hardware pedir */
     ESP_LOGI(TAG, "SPI pins: CS=%d CLK=%d MOSI=%d MISO=%d WP=%d HD=%d",
              PIN_SPI_CS, PIN_SPI_CLK, PIN_SPI_MOSI, PIN_SPI_MISO,
              PIN_SPI_WP, PIN_SPI_HD);
