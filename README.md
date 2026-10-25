@@ -239,6 +239,12 @@ Full API reference is available in the web UI under the **API Reference** sectio
 | `GET` | `/api/events` | SSE stream (access log + stats) |
 | `GET` | `/api/log` | Last 100 log entries |
 
+## Model Context Protocol (MCP) Server
+
+O RomEMU inclui um servidor MCP oficial padrão da Anthropic para agentes de IA autônomos (Hermes Agent, OMP, Claude Code, Cursor):
+
+Consulte a pasta [`mcp/`](mcp/) para instruções completas de configuração e uso das 11 ferramentas nativas de hardware.
+
 ## Architecture
 
 ```
