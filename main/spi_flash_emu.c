@@ -504,11 +504,11 @@ static void spi_emu_task(void *arg)
                 if (s_blue_blink) {
                     status_led_set_rgb(0, 0, 255); /* Azul 100% puro */
                 } else {
-                    status_led_set_rgb(0, 0, 0);   /* Apagado no ciclo de piscar */
+                    status_led_set_rgb(0, 0, 0);   /* Ciclo de piscar */
                 }
             } else {
-                /* Se CS desceu para 0 mas ainda não transmitiu bytes, fica 100% apagado esperando os dados */
-                status_led_set_rgb(0, 0, 0);
+                /* Se CS estiver em 0 (ou sem sinal), mantém a cor estável Verde Ready */
+                status_led_set_color(LED_COLOR_GREEN);
             }
             continue;
         }
@@ -523,9 +523,9 @@ static void spi_emu_task(void *arg)
 
         /* Process the transaction */
         process_transaction(ctx->rx_buf, rx_len, ctx->tx_buf, SPI_BUF_SIZE);
-        status_led_set_rgb(0, 255, 0); /* VERDE 100% puro e saturado na leitura SPI */
-        vTaskDelay(pdMS_TO_TICKS(15));  /* Mantém o flash verde visível ao olho humano */
-        status_led_set_rgb(0, 0, 0);   /* Apaga após a transação */
+        status_led_set_rgb(255, 255, 255); /* Flash BRANCO 100% puro para leitura SPI ativa */
+        vTaskDelay(pdMS_TO_TICKS(15));
+        status_led_set_color(LED_COLOR_GREEN); /* Retorna suavemente ao Verde Ready */
 
         /* Notifica subsistema de NVRAM persistente em caso de gravações na BIOS */
         uint8_t first_cmd = ctx->rx_buf[0];

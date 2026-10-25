@@ -223,7 +223,43 @@ void status_led_set_color(status_led_color_t color)
 void status_led_activity_flash(status_led_color_t flash_color)
 {
     status_led_set_color(flash_color);
-    vTaskDelay(pdMS_TO_TICKS(15));
+    vTaskDelay(pdMS_TO_TICKS(10));
     status_led_set_color(s_base_color);
+}
+
+/* Converte matiz HSV (0 a 359) para RGB puro */
+static void hsv2rgb(uint16_t h, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    uint8_t region = h / 60;
+    uint8_t remainder = (h - (region * 60)) * 255 / 60;
+    uint8_t q = 255 - remainder;
+    uint8_t t = remainder;
+
+    switch (region) {
+        case 0:  *r = 255; *g = t;   *b = 0;   break;
+        case 1:  *r = q;   *g = 255; *b = 0;   break;
+        case 2:  *r = 0;   *g = 255; *b = t;   break;
+        case 3:  *r = 0;   *g = q;   *b = 255; break;
+        case 4:  *r = t;   *g = 0;   *b = 255; break;
+        default: *r = 255; *g = 0;   *b = q;   break;
+    }
+}
+
+void status_led_boot_rainbow_to_green(uint32_t duration_ms)
+{
+    uint32_t steps = duration_ms / 20;
+    if (steps == 0) steps = 1;
+
+    /* Ciclo Rainbow com transição fluida de 360 graus */
+    for (uint32_t i = 0; i < steps; i++) {
+        uint16_t hue = (i * 360) / steps;
+        uint8_t r = 0, g = 0, b = 0;
+        hsv2rgb(hue, &r, &g, &b);
+        status_led_set_rgb(r, g, b);
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+
+    /* Suaviza e estabiliza fixo no Verde Ready */
+    status_led_set_color(LED_COLOR_GREEN);
 }
 

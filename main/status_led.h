@@ -27,4 +27,10 @@ void status_led_set_color(status_led_color_t color);
 void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b);
 void status_led_activity_flash(status_led_color_t flash_color);
 
+/**
+ * Executa uma animacao de transicao Rainbow (arco-iris suave)
+ * e estabiliza suavemente em Verde (Ready / Pronto).
+ */
+void status_led_boot_rainbow_to_green(uint32_t duration_ms);
+
 #endif /* STATUS_LED_H */
