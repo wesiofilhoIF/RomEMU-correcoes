@@ -227,6 +227,24 @@ void status_led_activity_flash(status_led_color_t flash_color)
     status_led_set_color(s_base_color);
 }
 
+void status_led_standby_breathe_step(void)
+{
+    static int s_brightness = 10;
+    static int s_delta = 8;
+
+    s_brightness += s_delta;
+    if (s_brightness >= 240) {
+        s_brightness = 240;
+        s_delta = -8;
+    } else if (s_brightness <= 10) {
+        s_brightness = 10;
+        s_delta = 8;
+    }
+
+    /* Amarelo puro vibrante: R e G com a mesma intensidade de brilho modulada pelo fade */
+    status_led_set_rgb((uint8_t)s_brightness, (uint8_t)s_brightness, 0);
+}
+
 /* Converte matiz HSV (0 a 359) para RGB puro */
 static void hsv2rgb(uint16_t h, uint8_t *r, uint8_t *g, uint8_t *b)
 {

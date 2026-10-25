@@ -28,6 +28,12 @@ void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b);
 void status_led_activity_flash(status_led_color_t flash_color);
 
 /**
+ * Atualiza o efeito de fade breathing (pulsacao suave) em amarelo puro
+ * para sinalizar modo Standby/Espera. Deve ser chamado periodicamente.
+ */
+void status_led_standby_breathe_step(void);
+
+/**
  * Dispara a animacao de comemoracao Rainbow (arco-iris fluido)
  * quando a placa-mae comeca a ler a BIOS com sucesso,
  * estabilizando em seguida no Verde Ready.

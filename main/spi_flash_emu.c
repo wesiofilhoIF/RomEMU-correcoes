@@ -507,8 +507,8 @@ static void spi_emu_task(void *arg)
                     status_led_set_rgb(0, 0, 0);   /* Ciclo de piscar */
                 }
             } else {
-                /* Se CS estiver em 0 (ou sem sinal), mantém a cor estável Verde Ready */
-                status_led_set_color(LED_COLOR_GREEN);
+                /* Em Standby / Espera: respiração suave (Fade Breathing) em Amarelo Puro */
+                status_led_standby_breathe_step();
             }
             continue;
         }
