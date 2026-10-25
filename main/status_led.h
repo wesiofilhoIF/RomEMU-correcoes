@@ -28,9 +28,10 @@ void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b);
 void status_led_activity_flash(status_led_color_t flash_color);
 
 /**
- * Executa uma animacao de transicao Rainbow (arco-iris suave)
- * e estabiliza suavemente em Verde (Ready / Pronto).
+ * Dispara a animacao de comemoracao Rainbow (arco-iris fluido)
+ * quando a placa-mae comeca a ler a BIOS com sucesso,
+ * estabilizando em seguida no Verde Ready.
  */
-void status_led_boot_rainbow_to_green(uint32_t duration_ms);
+void status_led_celebrate_rainbow(uint32_t duration_ms);
 
 #endif /* STATUS_LED_H */

@@ -245,21 +245,21 @@ static void hsv2rgb(uint16_t h, uint8_t *r, uint8_t *g, uint8_t *b)
     }
 }
 
-void status_led_boot_rainbow_to_green(uint32_t duration_ms)
+void status_led_celebrate_rainbow(uint32_t duration_ms)
 {
-    uint32_t steps = duration_ms / 20;
+    uint32_t steps = duration_ms / 15;
     if (steps == 0) steps = 1;
 
-    /* Ciclo Rainbow com transição fluida de 360 graus */
+    /* Ciclo Rainbow comemorativo rápido e vibrante (múltiplas voltas) */
     for (uint32_t i = 0; i < steps; i++) {
-        uint16_t hue = (i * 360) / steps;
+        uint16_t hue = (i * 720 / steps) % 360; /* 2 ciclos completos de arco-íris */
         uint8_t r = 0, g = 0, b = 0;
         hsv2rgb(hue, &r, &g, &b);
         status_led_set_rgb(r, g, b);
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(15));
     }
 
-    /* Suaviza e estabiliza fixo no Verde Ready */
+    /* Termina e crava no Verde de sucesso */
     status_led_set_color(LED_COLOR_GREEN);
 }
 

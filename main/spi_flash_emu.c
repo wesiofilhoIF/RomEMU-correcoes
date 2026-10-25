@@ -523,9 +523,18 @@ static void spi_emu_task(void *arg)
 
         /* Process the transaction */
         process_transaction(ctx->rx_buf, rx_len, ctx->tx_buf, SPI_BUF_SIZE);
-        status_led_set_rgb(255, 255, 255); /* Flash BRANCO 100% puro para leitura SPI ativa */
-        vTaskDelay(pdMS_TO_TICKS(15));
-        status_led_set_color(LED_COLOR_GREEN); /* Retorna suavemente ao Verde Ready */
+
+        /* Comemoração Rainbow: Disparada na primeira leitura real da BIOS! */
+        static bool s_celebrated = false;
+        if (!s_celebrated) {
+            s_celebrated = true;
+            status_led_celebrate_rainbow(2000); /* 2 segundos de Rainbow comemorativo! */
+        } else {
+            /* Nas leituras seguintes, pisca Verde e volta para Verde Ready */
+            status_led_set_rgb(0, 255, 0);
+            vTaskDelay(pdMS_TO_TICKS(10));
+            status_led_set_color(LED_COLOR_GREEN);
+        }
 
         /* Notifica subsistema de NVRAM persistente em caso de gravações na BIOS */
         uint8_t first_cmd = ctx->rx_buf[0];

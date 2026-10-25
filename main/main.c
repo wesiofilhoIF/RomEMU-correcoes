@@ -113,8 +113,8 @@ void app_main(void)
     ESP_LOGI(TAG, "-------------------------------------------");
     ESP_LOGI(TAG, "Ready. Upload a ROM image via the web UI.");
     
-    /* Efeito Rainbow fluido por 2.5 segundos que termina e crava em Verde Ready */
-    status_led_boot_rainbow_to_green(2500);
+    /* Standby limpo no boot aguardando a placa-mãe */
+    status_led_set_color(LED_COLOR_BLACK);
 
     ESP_LOGI(TAG, "SPI pins: CS=%d CLK=%d MOSI=%d MISO=%d WP=%d HD=%d",
              PIN_SPI_CS, PIN_SPI_CLK, PIN_SPI_MOSI, PIN_SPI_MISO,
