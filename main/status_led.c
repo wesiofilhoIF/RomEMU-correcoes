@@ -9,18 +9,13 @@
 
 static const char *TAG = "status_led";
 
-/*
- * ============================================================================
- * Matriz Fixa de Pinos para Produção (ESP32-S3 DevKitC + UNO D1 + SuperMini)
- * ============================================================================
- * - WS2812 RGB inteligente: GPIO 48 (v1.0) e GPIO 38 (v1.1)
- * - LEDs simples comuns (HIGH/LOW): GPIO 2 (D9), GPIO 13 (D13 UNO), GPIO 21
+/* 
+ * WS2812 RGB inteligente: GPIO 48 (v1.0) e GPIO 38 (v1.1)
+ * Desativados LEDs comuns em GPIO 13 pois 13 é o MISO da BIOS!
  */
 static const int s_rgb_pins[] = { 48, 38 };
-static const int s_gpio_pins[] = { 2, 13, 21 };
-
 #define NUM_RGB_PINS  (sizeof(s_rgb_pins) / sizeof(s_rgb_pins[0]))
-#define NUM_GPIO_PINS (sizeof(s_gpio_pins) / sizeof(s_gpio_pins[0]))
+#define NUM_GPIO_PINS 0
 
 static rmt_channel_handle_t s_led_chans[NUM_RGB_PINS] = { NULL };
 static rmt_encoder_handle_t s_led_encoders[NUM_RGB_PINS] = { NULL };
@@ -147,14 +142,9 @@ esp_err_t status_led_init(void)
         }
     }
 
-    /* 2. Init Standard GPIO indicator pins (GPIO 2, 13, 21) as outputs */
-    for (size_t i = 0; i < NUM_GPIO_PINS; i++) {
-        gpio_reset_pin((gpio_num_t)s_gpio_pins[i]);
-        gpio_set_direction((gpio_num_t)s_gpio_pins[i], GPIO_MODE_OUTPUT);
-        gpio_set_level((gpio_num_t)s_gpio_pins[i], 0);
-    }
+    /* 2. Standard GPIO indicator loop removed to avoid bus collisions */
 
-    status_led_set_color(LED_COLOR_YELLOW);
+    status_led_set_color(LED_COLOR_BLACK);
     return ESP_OK;
 }
 
@@ -202,10 +192,7 @@ void status_led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
     }
 
     /* Update standard digital LEDs: ON if any color component is active, OFF if black */
-    int level = (r > 0 || g > 0 || b > 0) ? 1 : 0;
-    for (size_t i = 0; i < NUM_GPIO_PINS; i++) {
-        gpio_set_level((gpio_num_t)s_gpio_pins[i], level);
-    }
+    /* Standard GPIO indicators removed to keep GPIO 13 clean for MISO */
 }
 
 /* Transições claras e sem confusão de cores:
