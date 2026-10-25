@@ -5,15 +5,41 @@
 
 ---
 
-### 🚀 O que foi corrigido neste Fork:
+### 🚀 O que foi corrigido e adicionado neste Fork (Edição de Bancada X99):
 
-1. **Fim do Out of Memory (OOM / HTTP 500) em imagens de 16 MB:**
+![RomEMU Oscilloscope & Logic UI](docs/img/romemu_oscilloscope_ui.png)
+
+1. **Osciloscópio Digital de Barramento SPI em Tempo Real:**
+   * Display com grade de laboratório (Dark CRT Graticule) e renderização gráfica via Canvas a 50 Hz.
+   * Monitoramento contínuo das 4 linhas críticas do barramento com formas de onda e transições de borda:
+     * 🔵 **CS (Chip Select):** Ciano (`#00d2ff`)
+     * 🟢 **CLK (Clock SPI):** Verde Neon (`#00ff88`)
+     * 🟡 **MOSI (Master Out):** Âmbar / Laranja (`#ffb700`)
+     * 🟣 **MISO (Master In):** Magenta (`#ff007f`)
+   * Badges de nível lógico instantâneo (`0` ou `1`) e indicação física de cada pino (`P10`, `P12`, `P11`, `P13`, `P47`, `P48`).
+
+2. **Guia de Cores de Diagnóstico de Bancada (LED WS2812 RGB):**
+   A sinalização visual do hardware foi totalmente reformulada para diagnóstico em tempo real sem precisar de computador conectado:
+
+   | Estado Visual | Cor / Padrão | Significado Técnico |
+   |---|---|---|
+   | **Standby / Espera** | 💛 **Amarelo Puro Pulsante** (*Fade Breathing*) | Firmware rodando, pronto e aguardando a placa-mãe ligar. |
+   | **Wi-Fi Conectado** | 🍊 **Duplo Flash Laranja Real** (`R:255, G:45, B:0`) | IP obtido com sucesso via DHCP e interface web ativa na rede. |
+   | **CS Vivo (Repouso)** | 🔵 **Azul Elétrico Piscando** (`0, 0, 255`) | Pino 10 detectou nível alto (3.3V) vindo do standby da placa-mãe. |
+   | **Leitura da BIOS** | 🌈 **Arco-Íris Comemorativo** (*Rainbow 2s*) | **Grande vitória!** Processador Xeon puxou clock e leu o primeiro bloco UEFI da ROM. |
+   | **Operação Estabilizada** | 🟢 **Verde Sólido (Ready)** | BIOS servida com sucesso; pisca pulsos rápidos em atividade contínua. |
+
+3. **Arquitetura Multicore Sem Deadlock (Core 0 + Core 1):**
+   * A task de emulação do SPI Slave roda com prioridade ultra-alta (24) no **Core 1** para latência zero perante o clock do PCH Intel C612.
+   * As animações de LED e processamento gráfico foram desacopladas para uma task dedicada no **Core 0**, eliminando qualquer risco de Watchdog Reset ou congelamento de clock.
+
+4. **Fim do Out of Memory (OOM / HTTP 500) em imagens de 16 MB:**
    * O firmware upstream tentava manter a descompressão bruta ou buffers duplicados na PSRAM, que estouram os 8 MB do ESP32-S3.
    * Implementada a função `cstore_create_from_lz4_archive()` com **Zero-Copy**: o ESP32 recebe a stream de blocos LZ4 pré-compactados e a adota diretamente na PSRAM.
    * **Consumo de PSRAM:** reduzido de 16 MB para apenas **~4.7 MB**, sobrando mais de 3.5 MB de folga!
-2. **Compressão e Ingestão de Blocos LZ4 de 4 KB:**
+5. **Compressão e Ingestão de Blocos LZ4 de 4 KB:**
    * Detecção inteligente de blocos apagados (`0xFF`) — blocos vazios não ocupam memória na PSRAM.
-3. **Persistência NVS e Emulação Automática:**
+6. **Persistência NVS e Emulação Automática:**
    * Salvamento do estado dos slots e do chip SPI (`W25Q128JV`) na memória NVS.
 
 ---
