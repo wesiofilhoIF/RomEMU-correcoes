@@ -496,7 +496,22 @@ static void spi_emu_task(void *arg)
         trans.rx_buffer = ctx->rx_buf;
 
         esp_err_t err = spi_slave_transmit(SPI2_HOST, &trans, pdMS_TO_TICKS(100));
-        if (err == ESP_ERR_TIMEOUT) continue;
+        if (err == ESP_ERR_TIMEOUT) {
+            /* Debug visual: se o CS estiver em 1 (repouso 3.3V), pisca em azul 100% de brilho */
+            if (gpio_get_level(PIN_SPI_CS) == 1) {
+                static bool s_blue_blink = false;
+                s_blue_blink = !s_blue_blink;
+                if (s_blue_blink) {
+                    status_led_set_rgb(0, 0, 255); /* Azul 100% puro */
+                } else {
+                    status_led_set_rgb(0, 0, 0);   /* Apagado no ciclo de piscar */
+                }
+            } else {
+                /* Se CS desceu para 0, mantém verde pronto para leitura */
+                status_led_set_rgb(0, 80, 0);
+            }
+            continue;
+        }
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "SPI slave transmit error: %s", esp_err_to_name(err));
             vTaskDelay(pdMS_TO_TICKS(10));
