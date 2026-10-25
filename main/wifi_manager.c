@@ -69,6 +69,8 @@ static const char *TAG = "wifi";
 #define WIFI_STA_MAX_RETRY      5
 #define WIFI_STA_TIMEOUT_MS     15000
 
+#include "status_led.h"
+
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_count = 0;
 static bool s_ap_mode = false;
@@ -93,6 +95,9 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "STA connected: %s", s_ip_str);
         s_retry_count = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_STA_CONNECTED_BIT);
+
+        /* Flash Laranja Real Bruto confirmando conexão Wi-Fi estabelecida! */
+        status_led_flash_wifi_orange();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
         ESP_LOGI(TAG, "AP: station " MACSTR " joined", MAC2STR(event->mac));

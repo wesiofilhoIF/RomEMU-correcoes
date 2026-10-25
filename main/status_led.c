@@ -281,3 +281,14 @@ void status_led_celebrate_rainbow(uint32_t duration_ms)
     status_led_set_color(LED_COLOR_GREEN);
 }
 
+void status_led_flash_wifi_orange(void)
+{
+    /* Laranja Real / Bruto no WS2812: R=255 pleno e G=45 (relação 5.6:1 sem esverdear) */
+    for (int p = 0; p < 2; p++) {
+        status_led_set_rgb(255, 45, 0);
+        vTaskDelay(pdMS_TO_TICKS(120));
+        status_led_set_rgb(0, 0, 0);
+        vTaskDelay(pdMS_TO_TICKS(80));
+    }
+}
+

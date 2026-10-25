@@ -40,4 +40,10 @@ void status_led_standby_breathe_step(void);
  */
 void status_led_celebrate_rainbow(uint32_t duration_ms);
 
+/**
+ * Pisca um pulso de Laranja Puro / Real (Amber-Orange balanceado com gama corrigida)
+ * com brilho bruto para sinalizar conexao / atividade de Wi-Fi estabelecida.
+ */
+void status_led_flash_wifi_orange(void);
+
 #endif /* STATUS_LED_H */
