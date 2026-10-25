@@ -7,7 +7,8 @@
 
 ### 🚀 O que foi corrigido e adicionado neste Fork (Edição de Bancada X99):
 
-![RomEMU Oscilloscope & Logic UI](docs/img/romemu_oscilloscope_ui.png)
+#### 📸 Visão Geral Completa da Interface:
+![RomEMU Full Dashboard](docs/img/romemu_full_dashboard.png)
 
 1. **Osciloscópio Digital de Barramento SPI em Tempo Real:**
    * Display com grade de laboratório (Dark CRT Graticule) e renderização gráfica via Canvas a 50 Hz.
@@ -17,6 +18,8 @@
      * 🟡 **MOSI (Master Out):** Âmbar / Laranja (`#ffb700`)
      * 🟣 **MISO (Master In):** Magenta (`#ff007f`)
    * Badges de nível lógico instantâneo (`0` ou `1`) e indicação física de cada pino (`P10`, `P12`, `P11`, `P13`, `P47`, `P48`).
+   * Gráfico de ondas em detalhe:
+     ![RomEMU Oscilloscope Detail](docs/img/romemu_oscilloscope_ui.png)
 
 2. **Guia de Cores de Diagnóstico de Bancada (LED WS2812 RGB):**
    A sinalização visual do hardware foi totalmente reformulada para diagnóstico em tempo real sem precisar de computador conectado:
