@@ -147,10 +147,140 @@ function gpioAction(action, params) {
 function updateGpioStatus(data) {
     const el = document.getElementById('gpio-status');
     if (!el) return;
-    el.innerHTML = '<div class="gpio-status-row">' +
-        '<span class="tag ' + (data.reset_asserted ? 'inserted' : '') + '">Reset: ' + (data.reset_asserted ? 'ASSERTED' : 'Released') + '</span>' +
-        ' <span class="tag ' + (data.power_on ? 'inserted' : 'ap-mode') + '">Power: ' + (data.power_on ? 'ON' : 'OFF') + '</span></div>';
+
+    /* Feed oscilloscope logic buffer */
+    if (typeof pushOscData === 'function') {
+        pushOscData(data);
+    }
+
+    const pinBadge = (name, val, activeHigh) => {
+        const isOne = (val === 1 || val === true);
+        const cls = isOne ? 'pin-high' : 'pin-low';
+        return '<div class="pin-pill ' + cls + '">' +
+               '<span class="pin-name">' + name + '</span>' +
+               '<span class="pin-val">' + (isOne ? '1' : '0') + '</span>' +
+               '</div>';
+    };
+
+    el.innerHTML = 
+        '<div class="spi-bus-grid">' +
+            pinBadge('CS (P10)', data.cs) +
+            pinBadge('CLK (P12)', data.clk) +
+            pinBadge('MOSI (P11)', data.mosi) +
+            pinBadge('MISO (P13)', data.miso) +
+            pinBadge('WP (P47)', data.wp) +
+            pinBadge('HD (P48)', data.hd) +
+        '</div>' +
+        '<div class="gpio-status-row" style="margin-top:8px;">' +
+            '<span class="tag ' + (data.reset_asserted ? 'inserted' : '') + '">Reset Out: ' + (data.reset_asserted ? 'ASSERTED (0)' : 'RELEASED (1)') + '</span>' +
+            ' <span class="tag ' + (data.power_on ? 'inserted' : 'ap-mode') + '">Power ATX: ' + (data.power_on ? 'ON (1)' : 'STANDBY (0)') + '</span>' +
+        '</div>';
 }
+
+/* ---- Oscilloscope Realtime Engine ---- */
+let oscHistory = {
+    cs: [],
+    clk: [],
+    mosi: [],
+    miso: []
+};
+const MAX_OSC_POINTS = 100;
+
+function pushOscData(data) {
+    if (!data) return;
+    const add = (arr, val) => {
+        arr.push(val ? 1 : 0);
+        if (arr.length > MAX_OSC_POINTS) arr.shift();
+    };
+    add(oscHistory.cs, data.cs !== undefined ? data.cs : 1);
+    add(oscHistory.clk, data.clk !== undefined ? data.clk : 0);
+    add(oscHistory.mosi, data.mosi !== undefined ? data.mosi : 0);
+    add(oscHistory.miso, data.miso !== undefined ? data.miso : 1);
+    drawOscilloscope();
+}
+
+function initOscilloscope() {
+    for (let i = 0; i < MAX_OSC_POINTS; i++) {
+        oscHistory.cs.push(1);
+        oscHistory.clk.push(0);
+        oscHistory.mosi.push(0);
+        oscHistory.miso.push(1);
+    }
+    drawOscilloscope();
+}
+
+function drawOscilloscope() {
+    const canvas = document.getElementById('osc-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Background & Graticule (Grade de laboratório)
+    ctx.fillStyle = '#0a0d12';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#16222f';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x < w; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+    for (let y = 0; y < h; y += 25) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    ctx.stroke();
+
+    // Canais do barramento SPI
+    const channels = [
+        { name: 'CS', color: '#00d2ff', data: oscHistory.cs, yBase: 45 },
+        { name: 'CLK', color: '#00ff88', data: oscHistory.clk, yBase: 95 },
+        { name: 'MOSI', color: '#ffb700', data: oscHistory.mosi, yBase: 145 },
+        { name: 'MISO', color: '#ff007f', data: oscHistory.miso, yBase: 195 }
+    ];
+
+    const stepX = w / (MAX_OSC_POINTS - 1);
+    const waveH = 26; // Altura do pulso lógico
+
+    channels.forEach(ch => {
+        ctx.strokeStyle = ch.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        // Rótulo do Canal
+        ctx.fillStyle = ch.color;
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(ch.name, 10, ch.yBase - waveH - 2);
+
+        // Nível atual (0 ou 1)
+        const curVal = ch.data[ch.data.length - 1];
+        ctx.fillStyle = curVal ? '#ffffff' : '#666666';
+        ctx.fillText(curVal ? '1' : '0', 48, ch.yBase - waveH - 2);
+
+        // Desenho da onda quadrada
+        for (let i = 0; i < ch.data.length; i++) {
+            const val = ch.data[i];
+            const x = i * stepX;
+            const y = ch.yBase - (val * waveH);
+
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                const prevVal = ch.data[i - 1];
+                const prevY = ch.yBase - (prevVal * waveH);
+                ctx.lineTo(x, prevY); // Reta horizontal
+                ctx.lineTo(x, y);     // Transição vertical de clock / subida / descida
+            }
+        }
+        ctx.stroke();
+
+        // Glow fosforescente
+        ctx.shadowColor = ch.color;
+        ctx.shadowBlur = 4;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initOscilloscope();
+});
 
 /* ---- Upload ---- */
 

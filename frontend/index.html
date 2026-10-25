@@ -83,10 +83,31 @@
 
         <!-- GPIO Control -->
         <section class="card" id="gpio-control">
-            <h2>Target Control</h2>
-            <div id="gpio-status" hx-get="/api/gpio" hx-trigger="load, every 3s" hx-swap="innerHTML">
-                <p class="muted">Loading...</p>
+            <div class="card-header">
+                <h2>Target Control & SPI Bus Logic</h2>
+                <span class="badge" id="osc-rate-badge">50 Hz Realtime</span>
             </div>
+            
+            <div id="gpio-status" hx-get="/api/gpio" hx-trigger="load, every 1s" hx-swap="innerHTML">
+                <p class="muted">Loading bus states...</p>
+            </div>
+
+            <!-- Digital Logic Oscilloscope Screen -->
+            <div class="oscilloscope-container">
+                <div class="osc-toolbar">
+                    <span class="osc-title">DIGITAL LOGIC OSCILLOSCOPE (SPI BUS)</span>
+                    <div class="osc-legend">
+                        <span class="osc-leg-item leg-cs"><span class="dot"></span>CS</span>
+                        <span class="osc-leg-item leg-clk"><span class="dot"></span>CLK</span>
+                        <span class="osc-leg-item leg-mosi"><span class="dot"></span>MOSI</span>
+                        <span class="osc-leg-item leg-miso"><span class="dot"></span>MISO</span>
+                    </div>
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="osc-canvas" width="800" height="220"></canvas>
+                </div>
+            </div>
+
             <div class="gpio-buttons">
                 <div class="gpio-group">
                     <h3 class="gpio-label">Reset</h3>
