@@ -222,9 +222,10 @@ void status_led_set_color(status_led_color_t color)
 
 void status_led_activity_flash(status_led_color_t flash_color)
 {
+    status_led_color_t previous = s_base_color;
     status_led_set_color(flash_color);
     vTaskDelay(pdMS_TO_TICKS(10));
-    status_led_set_color(s_base_color);
+    status_led_set_color(previous);
 }
 
 void status_led_standby_breathe_step(void)

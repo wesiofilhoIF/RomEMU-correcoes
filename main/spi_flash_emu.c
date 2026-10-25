@@ -473,6 +473,19 @@ static void IRAM_ATTR spi_post_trans_cb(spi_slave_transaction_t *trans)
     /* Actual processing happens in the task, not in ISR */
 }
 
+/* Task separada em Core 0 para animacao comemorativa sem bloquear o SPI Slave no Core 1 */
+static volatile bool s_celebrate_pending = false;
+static void led_celebrate_task(void *arg)
+{
+    while (1) {
+        if (s_celebrate_pending) {
+            s_celebrate_pending = false;
+            status_led_celebrate_rainbow(2000);
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
 /* ---- SPI emulation task (runs on Core 1 for lowest latency) ---- */
 
 static void spi_emu_task(void *arg)
@@ -524,16 +537,14 @@ static void spi_emu_task(void *arg)
         /* Process the transaction */
         process_transaction(ctx->rx_buf, rx_len, ctx->tx_buf, SPI_BUF_SIZE);
 
-        /* Comemoração Rainbow: Disparada na primeira leitura real da BIOS! */
+        /* Comemoração Rainbow: Disparada de forma assíncrona na primeira leitura real da BIOS */
         static bool s_celebrated = false;
         if (!s_celebrated) {
             s_celebrated = true;
-            status_led_celebrate_rainbow(2000); /* 2 segundos de Rainbow comemorativo! */
+            s_celebrate_pending = true; /* Acorda a task de LED no Core 0 sem travar o Core 1! */
         } else {
-            /* Nas leituras seguintes, pisca Verde e volta para Verde Ready */
+            /* Nas leituras seguintes, pisca Verde rápido sem vTaskDelay no Core 1 */
             status_led_set_rgb(0, 255, 0);
-            vTaskDelay(pdMS_TO_TICKS(10));
-            status_led_set_color(LED_COLOR_GREEN);
         }
 
         /* Notifica subsistema de NVRAM persistente em caso de gravações na BIOS */
@@ -634,6 +645,7 @@ esp_err_t spi_flash_emu_start(chip_type_t chip)
 
     /* Start the processing task on Core 1 for lowest latency */
     s_ctx.running = true;
+    xTaskCreatePinnedToCore(led_celebrate_task, "led_celeb", 3072, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(spi_emu_task, "spi_emu", 8192, &s_ctx, 24,
                             &s_ctx.task, 1);
 

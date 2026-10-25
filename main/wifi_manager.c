@@ -164,6 +164,10 @@ static bool has_sta_credentials(wifi_config_t *sta_cfg)
 esp_err_t wifi_manager_init(void)
 {
     s_wifi_event_group = xEventGroupCreate();
+    if (s_wifi_event_group == NULL) {
+        ESP_LOGE(TAG, "Falha ao alocar event group de Wi-Fi");
+        return ESP_ERR_NO_MEM;
+    }
 
     /* esp_netif_init() and esp_event_loop_create_default() are called in main.c */
 
