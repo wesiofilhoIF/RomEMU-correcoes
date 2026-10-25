@@ -190,22 +190,28 @@ curl -N http://romemu.local/api/events</pre>
 
         <!-- WiFi Configuration -->
         <section class="card" id="wifi-config">
-            <h2>WiFi Configuration</h2>
+            <div class="card-header">
+                <h2>WiFi Configuration</h2>
+                <button type="button" class="btn btn-small" id="wifi-scan-btn" onclick="scanWifiNetworks()">Scan Networks</button>
+            </div>
             <div id="wifi-info" hx-get="/api/wifi" hx-trigger="load" hx-swap="innerHTML">
                 <p class="muted">Loading...</p>
             </div>
-            <form hx-post="/api/wifi" hx-target="#wifi-result" hx-swap="innerHTML"
-                  hx-encoding="application/json">
+            <div id="wifi-scan-results" style="display:none; margin: 12px 0;">
+                <label style="font-size:0.85rem; color:#94a3b8; margin-bottom:6px; display:block;">Discovered Networks (Click to Select):</label>
+                <div id="wifi-networks-list" class="log-container" style="max-height:160px; overflow-y:auto; padding:6px; background:#0f172a; border-radius:6px; border:1px solid #334155;"></div>
+            </div>
+            <form id="wifi-form" onsubmit="submitWifi(event)">
                 <div class="form-row">
                     <label for="wifi-ssid">SSID</label>
-                    <input type="text" id="wifi-ssid" name="ssid" placeholder="Network name">
+                    <input type="text" id="wifi-ssid" name="ssid" placeholder="Network name" required>
                 </div>
                 <div class="form-row">
                     <label for="wifi-pass">Password</label>
                     <input type="password" id="wifi-pass" name="password" placeholder="Password">
                 </div>
-                <button type="submit" class="btn btn-primary">Connect</button>
-                <div id="wifi-result"></div>
+                <button type="submit" class="btn btn-primary" id="wifi-connect-btn">Connect &amp; Save</button>
+                <div id="wifi-result" style="margin-top:10px;"></div>
             </form>
         </section>
     </main>

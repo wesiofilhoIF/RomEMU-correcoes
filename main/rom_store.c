@@ -48,8 +48,8 @@ static void load_slot_metadata(int idx)
         s->occupied = false;
         s->inserted = false;
         s->data = NULL;
-        ESP_LOGI(TAG, "Slot %d metadata: %s (%s, %u bytes) - needs re-upload",
-                 idx, s->label, s->chip_type ? "configured" : "none", s->image_size);
+        ESP_LOGI(TAG, "Slot %d metadata: %s (%s, %lu bytes) - needs re-upload",
+                 idx, s->label, s->chip_type ? "configured" : "none", (unsigned long)s->image_size);
     }
 
     nvs_close(nvs);
@@ -160,8 +160,47 @@ esp_err_t rom_store_upload(int slot_idx, const uint8_t *data, uint32_t size,
 
     save_slot_metadata(slot_idx);
 
-    ESP_LOGI(TAG, "Slot %d: uploaded %u bytes as %s (CRC32: %08X)",
-             slot_idx, size, s->label[0] ? s->label : "(unnamed)", s->checksum);
+    ESP_LOGI(TAG, "Slot %d: uploaded %lu bytes as %s (CRC32: %08lX)",
+             slot_idx, (unsigned long)size, s->label[0] ? s->label : "(unnamed)", (unsigned long)s->checksum);
+    return ESP_OK;
+}
+
+esp_err_t rom_store_upload_cstore(int slot_idx, cstore_t *cs,
+                                   uint32_t original_size, chip_type_t chip_type,
+                                   const char *label)
+{
+    if (slot_idx < 0 || slot_idx >= ROM_SLOT_MAX) return ESP_ERR_INVALID_ARG;
+    if (!cs) return ESP_ERR_INVALID_ARG;
+
+    rom_slot_t *s = &s_slots[slot_idx];
+    if (s->inserted) {
+        ESP_LOGE(TAG, "Cannot upload to inserted slot %d, eject first", slot_idx);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Free existing data */
+    if (s->cstore) { cstore_destroy(s->cstore); s->cstore = NULL; }
+    if (s->data) { heap_caps_free(s->data); s->data = NULL; }
+
+    s->cstore = cs;
+    s->data = NULL;
+    s->compressed = true;
+    s->occupied = true;
+    s->chip_type = chip_type;
+    s->bus_type = chip_get_bus(chip_type);
+    s->image_size = original_size;
+    s->alloc_size = cstore_get_psram_usage(cs);
+    s->checksum = 0;  /* CRC not computed in streaming path */
+    s->inserted = false;
+    if (label && label[0]) {
+        strncpy(s->label, label, sizeof(s->label) - 1);
+        s->label[sizeof(s->label) - 1] = '\0';
+    }
+
+    save_slot_metadata(slot_idx);
+
+    ESP_LOGI(TAG, "Slot %d: uploaded %" PRIu32 " bytes via streaming DEFLATE→LZ4 (PSRAM: %lu KB)",
+             slot_idx, original_size, (unsigned long)(s->alloc_size / 1024));
     return ESP_OK;
 }
 

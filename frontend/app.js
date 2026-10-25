@@ -567,3 +567,85 @@ async function compressFile(file) {
         return await file.arrayBuffer();
     }
 }
+
+/* ---- WiFi Scanner and Connect handler ---- */
+
+async function scanWifiNetworks() {
+    const btn = document.getElementById('wifi-scan-btn');
+    const container = document.getElementById('wifi-scan-results');
+    const list = document.getElementById('wifi-networks-list');
+    if (!btn || !container || !list) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    container.style.display = 'block';
+    list.innerHTML = '<p class="muted" style="padding:6px;">Scanning 2.4GHz channels...</p>';
+
+    try {
+        const resp = await fetch('/api/wifi/scan');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const nets = await resp.json();
+
+        if (!nets || nets.length === 0) {
+            list.innerHTML = '<p class="muted" style="padding:6px;">No networks found</p>';
+            return;
+        }
+
+        let html = '';
+        nets.forEach(n => {
+            const safeSsid = (n.ssid || '').replace(/"/g, '&quot;');
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; margin-bottom:4px; background:#1e293b; border-radius:4px; cursor:pointer;" onclick="selectWifiNetwork('${safeSsid}')">
+                <span style="font-weight:600; color:#f1f5f9;">${safeSsid || '<em>[Hidden SSID]</em>'}</span>
+                <span style="font-size:0.8rem; color:#94a3b8;">${n.rssi} dBm &bull; ${n.auth} &bull; Ch ${n.channel}</span>
+            </div>`;
+        });
+        list.innerHTML = html;
+    } catch (err) {
+        list.innerHTML = `<p style="color:#ef4444; padding:6px;">Scan error: ${err.message}</p>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scan Networks';
+    }
+}
+
+function selectWifiNetwork(ssid) {
+    const input = document.getElementById('wifi-ssid');
+    const pass = document.getElementById('wifi-pass');
+    if (input) {
+        input.value = ssid;
+        if (pass) pass.focus();
+    }
+}
+
+async function submitWifi(e) {
+    e.preventDefault();
+    const btn = document.getElementById('wifi-connect-btn');
+    const res = document.getElementById('wifi-result');
+    const ssid = document.getElementById('wifi-ssid').value;
+    const pass = document.getElementById('wifi-pass').value;
+
+    if (!ssid) return;
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+    res.innerHTML = '<p class="muted">Connecting to ' + ssid + '...</p>';
+
+    try {
+        const resp = await fetch('/api/wifi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ssid: ssid, password: pass })
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            res.innerHTML = '<p style="color:#22c55e;">Connected successfully! IP will update in a moment.</p>';
+            setTimeout(() => { htmx.trigger('#wifi-info', 'load'); }, 3000);
+        } else {
+            res.innerHTML = '<p style="color:#ef4444;">Error: ' + (data.error || 'Connection failed') + '</p>';
+        }
+    } catch (err) {
+        res.innerHTML = '<p style="color:#ef4444;">Request failed: ' + err.message + '</p>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect & Save';
+    }
+}

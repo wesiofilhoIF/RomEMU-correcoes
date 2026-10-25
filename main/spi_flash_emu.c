@@ -4,6 +4,7 @@
 #include "compressed_store.h"
 #include "access_log.h"
 #include "status_led.h"
+#include "nvram_storage.h"
 #include "pin_config.h"
 
 #include "driver/spi_slave.h"
@@ -507,6 +508,22 @@ static void spi_emu_task(void *arg)
 
         /* Process the transaction */
         process_transaction(ctx->rx_buf, rx_len, ctx->tx_buf, SPI_BUF_SIZE);
+        status_led_set_rgb(0, 255, 0); /* Verde escuro e forte saturado na leitura SPI */
+
+        /* Notifica subsistema de NVRAM persistente em caso de gravações na BIOS */
+        uint8_t first_cmd = ctx->rx_buf[0];
+        if (first_cmd == SPI_CMD_PAGE_PROGRAM || first_cmd == SPI_CMD_PAGE_PROGRAM_4B ||
+            first_cmd == SPI_CMD_SECTOR_ERASE || first_cmd == SPI_CMD_SECTOR_ERASE_4B ||
+            first_cmd == SPI_CMD_BLOCK_ERASE_32K || first_cmd == SPI_CMD_BLOCK_ERASE_64K ||
+            first_cmd == SPI_CMD_BLOCK_ERASE_64K_4B) {
+            bool use_4b = (first_cmd == SPI_CMD_PAGE_PROGRAM_4B || first_cmd == SPI_CMD_SECTOR_ERASE_4B ||
+                           first_cmd == SPI_CMD_BLOCK_ERASE_64K_4B || ctx->four_byte_mode);
+            int a_len = use_4b ? 4 : 3;
+            if (rx_len >= (uint32_t)(1 + a_len)) {
+                uint32_t wr_addr = decode_address(ctx->rx_buf + 1, a_len == 4);
+                nvram_storage_notify_write(wr_addr, 4096);
+            }
+        }
     }
 
     vTaskDelete(NULL);
@@ -535,7 +552,7 @@ esp_err_t spi_flash_emu_init(void)
 
 esp_err_t spi_flash_emu_start(chip_type_t chip)
 {
-    status_led_set_color(LED_COLOR_CYAN);
+    status_led_set_color(LED_COLOR_BLUE);
     const spi_chip_info_t *info = spi_chip_find(chip);
     if (!info) {
         ESP_LOGE(TAG, "Unknown SPI chip type: %d", chip);
@@ -559,8 +576,8 @@ esp_err_t spi_flash_emu_start(chip_type_t chip)
         .mosi_io_num = PIN_SPI_MOSI,
         .miso_io_num = PIN_SPI_MISO,
         .sclk_io_num = PIN_SPI_CLK,
-        .quadwp_io_num = PIN_SPI_WP,
-        .quadhd_io_num = PIN_SPI_HD,
+        .quadwp_io_num = -1,  /* Desativa Quad WP do driver SPI slave */
+        .quadhd_io_num = -1,  /* Desativa Quad HD do driver SPI slave */
         .max_transfer_sz = SPI_BUF_SIZE,
     };
 
@@ -573,10 +590,15 @@ esp_err_t spi_flash_emu_start(chip_type_t chip)
         .post_trans_cb = spi_post_trans_cb,
     };
 
-    /* Enable pull-ups on SPI pins */
-    gpio_set_pull_mode(PIN_SPI_MOSI, GPIO_PULLUP_ONLY);
-    gpio_set_pull_mode(PIN_SPI_CLK, GPIO_PULLUP_ONLY);
+    /* Enable pull-up only on CS and MOSI; CLK must float for Mode 0 (CPOL=0) */
     gpio_set_pull_mode(PIN_SPI_CS, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(PIN_SPI_MOSI, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(PIN_SPI_CLK, GPIO_FLOATING);
+    gpio_set_pull_mode(PIN_SPI_MISO, GPIO_FLOATING);
+
+    /* Força pull-up interno nos pinos WP e HOLD caso o usuário ligue no ESP32 */
+    gpio_set_pull_mode(PIN_SPI_WP, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(PIN_SPI_HD, GPIO_PULLUP_ONLY);
 
     esp_err_t err = spi_slave_initialize(SPI2_HOST, &bus_cfg, &slave_cfg, SPI_DMA_CHAN);
     if (err != ESP_OK) {
@@ -602,12 +624,13 @@ esp_err_t spi_flash_emu_stop(void)
     if (!s_ctx.running) return ESP_OK;
 
     s_ctx.running = false;
+    spi_slave_free(SPI2_HOST); /* Libera o host antes para desbloquear chamadas pendentes */
+
     if (s_ctx.task) {
-        vTaskDelay(pdMS_TO_TICKS(200));
+        vTaskDelay(pdMS_TO_TICKS(50));
         s_ctx.task = NULL;
     }
 
-    spi_slave_free(SPI2_HOST);
     ESP_LOGI(TAG, "SPI emulation stopped");
     return ESP_OK;
 }

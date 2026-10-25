@@ -8,6 +8,8 @@
 #include "esp_heap_caps.h"
 #include "nvs_flash.h"
 #include "esp_timer.h"
+#include "esp_partition.h"
+#include "compressed_store.h"
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "sdkconfig.h"
@@ -32,6 +34,8 @@ static const char *TAG = "romemu";
 #else
 #define TARGET_NAME "ESP32-S3"
 #endif
+
+#include "nvram_storage.h"
 
 void app_main(void)
 {
@@ -114,6 +118,34 @@ void app_main(void)
              PIN_SPI_WP, PIN_SPI_HD);
     ESP_LOGI(TAG, "I2C pins: SDA=%d SCL=%d", PIN_I2C_SDA, PIN_I2C_SCL);
     ESP_LOGI(TAG, "GPIO:     RESET=%d POWER=%d", PIN_RESET_OUT, PIN_POWER_OUT);
+
+    /* --- Auto-Mount BIOS from Permanent Flash Storage --- */
+    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, 0x99, "bios_storage");
+    if (part) {
+        ESP_LOGI(TAG, "Found bios_storage partition (size: %lu bytes). Checking for stored BIOS...", (unsigned long)part->size);
+        uint32_t magic_header = 0;
+        if (esp_partition_read(part, 0, &magic_header, sizeof(magic_header)) == ESP_OK && magic_header > 0 && magic_header <= 4096) {
+            uint32_t archive_size = 4978386; /* LZ4 archive size */
+            uint8_t *archive_buf = heap_caps_malloc(archive_size, MALLOC_CAP_SPIRAM);
+            if (!archive_buf) archive_buf = heap_caps_malloc(archive_size, MALLOC_CAP_INTERNAL);
+            if (archive_buf) {
+                if (esp_partition_read(part, 0, archive_buf, archive_size) == ESP_OK) {
+                    cstore_t *cs = cstore_create_from_lz4_archive(archive_buf, archive_size, 16777216, 16777216);
+                    if (cs) {
+                        rom_store_upload_cstore(0, cs, 16777216, CHIP_W25Q128, "X99_XD4_MOD");
+                        rom_store_insert(0);
+                        spi_flash_emu_start(CHIP_W25Q128);
+
+                        /* Inicializa persistência de NVRAM e restaura variáveis de Setup salvas */
+                        nvram_storage_init();
+                        nvram_storage_restore_to_active();
+
+                        ESP_LOGI(TAG, ">>> SUCCESS: BIOS Auto-Mounted permanently to Slot 0 (W25Q128JV) & SPI Emulation Active! <<<");
+                    }
+                }
+            }
+        }
+    }
 
     /* Main loop - watchdog + periodic status */
     uint32_t last_status_print = 0;

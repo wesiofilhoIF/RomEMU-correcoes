@@ -39,6 +39,7 @@ extern esp_err_t handler_api_chip_set(httpd_req_t *req);
 extern esp_err_t handler_api_stats(httpd_req_t *req);
 extern esp_err_t handler_api_stats_reset(httpd_req_t *req);
 extern esp_err_t handler_api_wifi_get(httpd_req_t *req);
+extern esp_err_t handler_api_wifi_scan(httpd_req_t *req);
 extern esp_err_t handler_api_wifi_set(httpd_req_t *req);
 extern esp_err_t handler_api_log(httpd_req_t *req);
 extern esp_err_t handler_api_events(httpd_req_t *req);
@@ -64,6 +65,7 @@ static const httpd_uri_t uri_handlers[] = {
     { .uri = "/api/stats",      .method = HTTP_GET,    .handler = handler_api_stats },
     { .uri = "/api/stats/reset",.method = HTTP_POST,   .handler = handler_api_stats_reset },
     { .uri = "/api/wifi",       .method = HTTP_GET,    .handler = handler_api_wifi_get },
+    { .uri = "/api/wifi/scan",  .method = HTTP_GET,    .handler = handler_api_wifi_scan },
     { .uri = "/api/wifi",       .method = HTTP_POST,   .handler = handler_api_wifi_set },
     { .uri = "/api/log",        .method = HTTP_GET,    .handler = handler_api_log },
     { .uri = "/api/events",     .method = HTTP_GET,    .handler = handler_api_events },

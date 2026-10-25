@@ -26,7 +26,40 @@
 #include <sys/socket.h>
 #include "miniz.h"
 
+#include "nvram_storage.h"
+#include "esp_partition.h"
+
 static const char *TAG = "web_hdlr";
+
+/* Grava automaticamente a nova ROM na particao bios_storage para substituir a guardada na Flash */
+static void persist_uploaded_rom_to_flash(const uint8_t *data, size_t len)
+{
+    const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, 0x99, "bios_storage");
+    if (!part) {
+        ESP_LOGW(TAG, "bios_storage partition not found, skipping Flash persistence");
+        return;
+    }
+    if (len > 0x00500000UL) {
+        ESP_LOGW(TAG, "Uploaded ROM archive exceeds 5MB Flash limit (%u bytes)", (unsigned)len);
+        return;
+    }
+
+    /* Arredonda para blocos de 4KB para apagar setores */
+    size_t erase_len = (len + 4095) & ~4095;
+    ESP_LOGI(TAG, "Substituindo BIOS guardada na Flash interna (tamanho: %u bytes)...", (unsigned)len);
+
+    esp_err_t err = esp_partition_erase_range(part, 0, erase_len);
+    if (err == ESP_OK) {
+        err = esp_partition_write(part, 0, data, len);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, ">>> SUCESSO: Nova BIOS gravada permanentemente na Flash interna! <<<");
+        } else {
+            ESP_LOGE(TAG, "Falha ao gravar BIOS na Flash: %s", esp_err_to_name(err));
+        }
+    } else {
+        ESP_LOGE(TAG, "Falha ao apagar particao Flash: %s", esp_err_to_name(err));
+    }
+}
 
 /* Forward declarations for slot action handlers */
 esp_err_t handler_api_slot_upload(httpd_req_t *req);
@@ -344,6 +377,9 @@ esp_err_t handler_api_slot_upload(httpd_req_t *req)
 
         ESP_LOGI(TAG, "Ingesting direct LZ4 archive: %d bytes -> original %" PRIu32, received, original_size);
 
+        /* Substitui permanentemente a ROM guardada na Flash interna do ESP32 */
+        persist_uploaded_rom_to_flash(buf, received);
+
         /* cstore_create_from_lz4_archive takes ownership of buf (ZERO-COPY) */
         cstore_t *cs = cstore_create_from_lz4_archive(buf, received, original_size, chip_size_for_cstore);
 
@@ -371,6 +407,9 @@ esp_err_t handler_api_slot_upload(httpd_req_t *req)
 
     uint8_t *final_buf = buf;
     int final_size = received;
+
+    /* Substitui permanentemente a ROM guardada na Flash interna do ESP32 */
+    persist_uploaded_rom_to_flash(final_buf, final_size);
 
     esp_err_t err = rom_store_upload(slot, final_buf, final_size, chip_type,
                                       label[0] ? label : NULL);
@@ -678,6 +717,22 @@ esp_err_t handler_api_wifi_get(httpd_req_t *req)
     return httpd_resp_send(req, buf, strlen(buf));
 }
 
+esp_err_t handler_api_wifi_scan(httpd_req_t *req)
+{
+    char *buf = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM);
+    if (!buf) buf = heap_caps_malloc(4096, MALLOC_CAP_INTERNAL);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        return ESP_FAIL;
+    }
+
+    wifi_manager_scan_networks_json(buf, 4096);
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t res = httpd_resp_send(req, buf, strlen(buf));
+    heap_caps_free(buf);
+    return res;
+}
+
 esp_err_t handler_api_wifi_set(httpd_req_t *req)
 {
     char body[128] = {};
@@ -808,6 +863,8 @@ esp_err_t handler_api_gpio_action(httpd_req_t *req)
         gpio_control_power_on();
     } else if (strcmp(action, "power/off") == 0) {
         gpio_control_power_off();
+    } else if (strcmp(action, "power/pulse") == 0) {
+        gpio_control_power_on();
     } else if (strcmp(action, "power/cycle") == 0) {
         gpio_control_power_cycle(duration, param2);
     } else {

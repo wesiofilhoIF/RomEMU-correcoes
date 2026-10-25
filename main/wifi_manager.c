@@ -67,7 +67,7 @@ static const char *TAG = "wifi";
 #define WIFI_STA_CONNECTED_BIT  BIT0
 #define WIFI_STA_FAIL_BIT       BIT1
 #define WIFI_STA_MAX_RETRY      5
-#define WIFI_STA_TIMEOUT_MS     10000
+#define WIFI_STA_TIMEOUT_MS     15000
 
 static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_count = 0;
@@ -82,13 +82,11 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_count < WIFI_STA_MAX_RETRY) {
-            esp_wifi_connect();
-            s_retry_count++;
-            ESP_LOGI(TAG, "Retry STA connection (%d/%d)", s_retry_count, WIFI_STA_MAX_RETRY);
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_STA_FAIL_BIT);
-        }
+        /* Auto-reconnect contínuo com backoff suave para estabilidade máxima na bancada */
+        s_retry_count++;
+        ESP_LOGI(TAG, "WiFi desconectado. Tentando reconexão (%d)...", s_retry_count);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_wifi_connect();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         snprintf(s_ip_str, sizeof(s_ip_str), IPSTR, IP2STR(&event->ip_info.ip));
@@ -143,17 +141,19 @@ static esp_err_t start_ap_mode(void)
 static bool has_sta_credentials(wifi_config_t *sta_cfg)
 {
     nvs_handle_t nvs;
-    if (nvs_open("wifi", NVS_READONLY, &nvs) != ESP_OK) return false;
-
+    if (nvs_open("wifi", NVS_READONLY, &nvs) != ESP_OK) {
+        return false;
+    }
     size_t ssid_len = sizeof(sta_cfg->sta.ssid);
     size_t pass_len = sizeof(sta_cfg->sta.password);
-    bool ok = (nvs_get_str(nvs, "ssid", (char *)sta_cfg->sta.ssid, &ssid_len) == ESP_OK &&
-               ssid_len > 1);
-    if (ok) {
+    esp_err_t err = nvs_get_str(nvs, "ssid", (char *)sta_cfg->sta.ssid, &ssid_len);
+    if (err == ESP_OK && ssid_len > 1) {
         nvs_get_str(nvs, "pass", (char *)sta_cfg->sta.password, &pass_len);
+        nvs_close(nvs);
+        return true;
     }
     nvs_close(nvs);
-    return ok;
+    return false;
 }
 
 esp_err_t wifi_manager_init(void)
@@ -167,6 +167,9 @@ esp_err_t wifi_manager_init(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    /* Desativa economia de energia para latência mínima e alcance máximo na bancada */
+    esp_wifi_set_ps(WIFI_PS_NONE);
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, NULL));
@@ -278,6 +281,75 @@ int8_t wifi_manager_get_rssi(void)
 bool wifi_manager_is_ap_mode(void)
 {
     return s_ap_mode;
+}
+
+int wifi_manager_scan_networks_json(char *buf, size_t buf_size)
+{
+    /* Inicia varredura ativa de redes 2.4GHz */
+    wifi_scan_config_t scan_config = {
+        .ssid = NULL,
+        .bssid = NULL,
+        .channel = 0,
+        .show_hidden = true,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time = {
+            .active = { .min = 100, .max = 250 }
+        }
+    };
+
+    esp_err_t err = esp_wifi_scan_start(&scan_config, true);
+    if (err != ESP_OK) {
+        return snprintf(buf, buf_size, "[]");
+    }
+
+    uint16_t ap_count = 0;
+    esp_wifi_scan_get_ap_num(&ap_count);
+    if (ap_count == 0) {
+        return snprintf(buf, buf_size, "[]");
+    }
+
+    if (ap_count > 20) ap_count = 20; /* Limita aos 20 melhores para não estourar buffer */
+    wifi_ap_record_t *ap_list = malloc(sizeof(wifi_ap_record_t) * ap_count);
+    if (!ap_list) {
+        return snprintf(buf, buf_size, "[]");
+    }
+
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_list));
+
+    int offset = snprintf(buf, buf_size, "[");
+    for (int i = 0; i < ap_count; i++) {
+        const char *auth = "OPEN";
+        switch (ap_list[i].authmode) {
+            case WIFI_AUTH_WEP: auth = "WEP"; break;
+            case WIFI_AUTH_WPA_PSK: auth = "WPA"; break;
+            case WIFI_AUTH_WPA2_PSK: auth = "WPA2"; break;
+            case WIFI_AUTH_WPA_WPA2_PSK: auth = "WPA/WPA2"; break;
+            case WIFI_AUTH_WPA3_PSK: auth = "WPA3"; break;
+            case WIFI_AUTH_WPA2_WPA3_PSK: auth = "WPA2/WPA3"; break;
+            default: break;
+        }
+
+        /* Limpa SSIDs vazios ou ocultos */
+        char safe_ssid[33] = {};
+        memcpy(safe_ssid, ap_list[i].ssid, sizeof(safe_ssid) - 1);
+
+        int written = snprintf(buf + offset, buf_size - offset,
+            "%s{\"ssid\":\"%s\",\"rssi\":%d,\"auth\":\"%s\",\"channel\":%d}",
+            (i > 0) ? "," : "",
+            safe_ssid,
+            ap_list[i].rssi,
+            auth,
+            ap_list[i].primary);
+
+        if (written > 0 && (size_t)(offset + written) < buf_size) {
+            offset += written;
+        } else {
+            break;
+        }
+    }
+    snprintf(buf + offset, buf_size - offset, "]");
+    free(ap_list);
+    return offset + 1;
 }
 
 #endif /* !CONFIG_IDF_TARGET_ESP32P4 */

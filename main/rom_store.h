@@ -57,6 +57,14 @@ int rom_store_get_active_idx(bus_type_t bus);
 esp_err_t rom_store_save_metadata(void);
 
 /**
+ * Upload a pre-built cstore to a slot (for streaming DEFLATE→LZ4 path).
+ * Takes ownership of the cstore_t pointer on success.
+ */
+esp_err_t rom_store_upload_cstore(int slot_idx, cstore_t *cs,
+                                   uint32_t original_size, chip_type_t chip_type,
+                                   const char *label);
+
+/**
  * Compute CRC32 of slot data.
  */
 uint32_t rom_store_crc32(const uint8_t *data, uint32_t len);

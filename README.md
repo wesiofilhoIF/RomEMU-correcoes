@@ -227,6 +227,7 @@ Full API reference is available in the web UI under the **API Reference** sectio
 | `GET` | `/api/stats` | R/W/erase counters |
 | `POST` | `/api/stats/reset` | Reset statistics |
 | `GET` | `/api/wifi` | WiFi info |
+| `GET` | `/api/wifi/scan` | Scan nearby 2.4GHz WiFi networks |
 | `POST` | `/api/wifi` | Set WiFi (`{"ssid":"...","password":"..."}`) |
 | `GET` | `/api/gpio` | Reset & power pin state |
 | `POST` | `/api/gpio/reset/pulse` | Pulse reset (`{"duration": 100}`) |

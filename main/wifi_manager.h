@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esp_err.h"
+#include <stdbool.h>
 
 /**
  * Initialize WiFi subsystem.
@@ -34,3 +35,9 @@ int8_t wifi_manager_get_rssi(void);
  * Returns true if operating in AP mode.
  */
 bool wifi_manager_is_ap_mode(void);
+
+/**
+ * Scan for nearby 2.4GHz WiFi networks and format results as a JSON array.
+ * e.g. [{"ssid":"Casa","rssi":-55,"auth":"WPA2","channel":6}, ...]
+ */
+int wifi_manager_scan_networks_json(char *buf, size_t buf_size);

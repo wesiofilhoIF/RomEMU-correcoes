@@ -12,6 +12,7 @@ idf_component_register(
         "sse_manager.c"
         "gpio_control.c"
         "eth_manager.c"
+        "nvram_storage.c"
         "lz4_block.c"
         "compressed_store.c"
     INCLUDE_DIRS "."

@@ -10,7 +10,9 @@
 #include "esp_eth.h"
 #include "esp_eth_mac.h"
 #include "esp_eth_phy.h"
+#if CONFIG_IDF_TARGET_ESP32P4
 #include "esp_eth_phy_ip101.h"
+#endif
 #include "driver/gpio.h"
 #include "mdns.h"
 #include "freertos/FreeRTOS.h"
@@ -91,7 +93,11 @@ esp_err_t eth_manager_init(void)
     phy_cfg.phy_addr = 1;
     phy_cfg.reset_gpio_num = PIN_ETH_PHY_RST;
 
+#if CONFIG_IDF_TARGET_ESP32P4
     esp_eth_phy_t *phy = esp_eth_phy_new_ip101(&phy_cfg);
+#else
+    esp_eth_phy_t *phy = NULL;
+#endif
 
     /* Create Ethernet driver */
     esp_eth_config_t eth_cfg = ETH_DEFAULT_CONFIG(mac, phy);

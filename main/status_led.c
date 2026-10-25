@@ -214,7 +214,7 @@ void status_led_set_color(status_led_color_t color)
     switch (color) {
     case LED_COLOR_BLACK:   status_led_set_rgb(0, 0, 0); break;
     case LED_COLOR_RED:     status_led_set_rgb(180, 0, 0); break;    /* Solid Red */
-    case LED_COLOR_GREEN:   status_led_set_rgb(0, 150, 0); break;    /* Calibrated Green */
+    case LED_COLOR_GREEN:   status_led_set_rgb(0, 80, 0); break;    /* Verde bem escuro e denso (Ready) */
     case LED_COLOR_BLUE:    status_led_set_rgb(0, 0, 180); break;    /* Solid Blue */
     case LED_COLOR_YELLOW:  status_led_set_rgb(200, 80, 0); break;   /* Perceptual Yellow (Warm Amber, G dialed down) */
     case LED_COLOR_CYAN:    status_led_set_rgb(0, 45, 180); break;   /* Perceptual Cyan (Turquoise, G suppressed to avoid die bleed) */
